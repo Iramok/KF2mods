@@ -1,0 +1,89 @@
+class ZeroLevel extends KFMutator;
+
+//プレイヤーが生成されたときに一度だけ呼ばれる
+function ModifyPlayer(Pawn Other) {
+	local KFPlayerController KFPC;
+	local KFPerk KFP;
+	local int i;
+	//スーパーの処理
+		super.ModifyPlayer(Other);
+	//ゼロレベル化
+		KFPC = KFPlayerController(Other.GetALocalPlayerController());
+		for(i=0;i<KFPC.PerkList.length;++i) {
+			KFP = KFPC.PerkList[i].PerkArchetype;
+				KFP.SetLevel(0);
+				KFP.SetPerkBuild(0);
+				KFP.PerkLevelUpdated();
+				KFP.UpdateSkills();
+			KFPC.NotifyLevelUp(KFPC.PerkList[i].PerkClass,0);
+		}
+//		KFPlayerController(Other.GetALocalPlayerController()).NotifyLevelUp(KFPC.PerkList[i].PerkClass,0);
+	//
+}
+
+/**
+	local KFPlayerController KFPC;
+	local int i;
+		foreach LocalPlayerControllers(class'KFPlayerController', KFPC) {
+			KFPC.NotifyLevelUp(KFPC.PerkList[i].PerkClass,0);
+//		foreach WorldInfo.AllControllers(class'KFPlayerController', KFPC) {
+			//現在選択中のパークに反映
+				SetKFPerkZeroLevel(KFPC.CurrentPerk);
+			//パークリストすべてに反映
+				for(i=0;i<KFPC.PerkList.length;++i) {
+					KFPC.PerkList[i].PerkLevel = 0;
+					SetKFPerkZeroLevel(KFPC.PerkList[i].PerkArchetype);
+					GetALocalPlayerController
+					
+				}
+		}
+	//
+}
+
+//ゼロレベル化
+function SetKFPerkZeroLevel(KFPerk KFP) {
+	//
+//		KFP.TacticalReload = PerkSkill(None);
+	//経験値なんてなかった
+		KFP.CurrentAbilityPoints = 0;
+		KFP.MaxAbilityPoints = 0;
+	//レベルを奪う
+		KFP.SetLevel(0);
+		KFP.SetPerkBuild(0);
+		KFP.PerkLevelUpdated();
+		KFP.UpdateSkills();
+	//
+}
+
+**/
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+/**
+
+//local限定なら動作可能
+for(i=0;i<KFPC.PerkList.length;++i) {
+	KFPC.NotifyLevelUp(KFPC.PerkList[i].PerkClass,0);
+}
+//
+
+	//				KFPC.PostTierUnlock(KFPC.PerkList[i].PerkClass);
+			//
+//			KFPC.RequestPerkChange((KFPC.SavedPerkIndex+1)%KFPC.PerkList.length);
+//			KFPC.RequestPerkChange(KFPC.SavedPerkIndex);
+struct native PerkInfo
+{
+  	var class<KFPerk> 	PerkClass;
+  	var byte			PerkLevel;	// This perk level is specifically used for clientside UI
+  	var KFPerk			PerkArchetype;
+};
+			//
+				foreach KFPC.GetPerk().PerkSkills(PS) {
+					PS.bActive = false;
+				}
+//var				int			CurrentAbilityPoints;
+//var				byte		MaxAbilityPoints;
+//			KFPC.PerkList[i].PerkLevel = 0;
+//			KFPC.PostTierUnlock( KFPC.PerkList[i].PerkClass );
+//			SetActivePerkLevel( PerkLevel );
+**/

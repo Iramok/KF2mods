@@ -1,0 +1,182 @@
+//<<---EOF--->>//
+
+					if (!(SM.GetNumAINeeded()>0)) {
+						PowerZeds_SpawnOnWaveEnd();
+					}
+	
+	//ウェーブ終了直前のスポーン
+	function PowerZeds_SpawnOnWaveEnd() {
+/*
+		local array<class<KFPawn_Monster> > SpawnList;
+		local int i,SpawnNum;
+		local KFAISpawnManager SM;
+		//隊列の用意
+			SpawnNum = MaxSpawnNumOnWaveEnd*MyKFGI.MyKFGRI.WaveNum/(MyKFGI.MyKFGRI.WaveMax-1);
+			for (i=0;i<SpawnNum;++i) {
+				SpawnList.AddItem(class'PowerZeds_KFP_Crawler');
+			}
+		//隊列のスポーン要請
+			SM = MyKFGI.SpawnManager;
+			MyKFGI.NumAISpawnsQueued += SM.SpawnSquad( SpawnList );
+			TimeNextSpawn = WorldInfo.TimeSeconds + SM.CalcNextGroupSpawnTime();
+		//
+*/
+	}
+/**
+
+//変更する大きさ（一番小さい時）
+const VisualSizeRate = 0.65;
+
+//ダメージを受けると縮んでいく
+event TakeDamage(int Damage, Controller InstigatedBy, vector HitLocation, vector Momentum, class<DamageType> DamageType, optional TraceHitInfo HitInfo, optional Actor DamageCauser) {
+	super.TakeDamage( Damage, InstigatedBy, HitLocation, Momentum, DamageType, HitInfo, DamageCauser );
+	SetVisualScale((1.0-VisualSizeRate)*float(Health)/float(HealthMax)+VisualSizeRate);
+}
+
+//死亡時に大きさを戻す
+function bool Died(Controller Killer, class<DamageType> DamageType, vector HitLocation) {
+	SetVisualScale(1.0);
+	return super.Died(Killer, damageType, HitLocation);
+}
+
+
+///////////////////////////////////////////わーぷ///////////////////////////////////////////
+	if (CanWarp()) {
+		Move( (Controller.Enemy.Location-Location) / 5 );
+		LastWarpedTime = WorldInfo.TimeSeconds;
+	}
+
+function bool CanWarp() {
+	
+	 return ( (Controller.Enemy!=None) && ( (LastWarpedTime==0) || (`TimeSince(LastWarpedTime)>TimeBetweenWarp) ) );
+}
+
+**/
+
+///////////////////////////////////////////HeadShotOnly///////////////////////////////////////////
+
+//でばっぐよー
+
+/**
+
+var KFPlayerController KFPC;
+var int fcount;
+
+//ゲーム開始時に一度だけ呼ばれる？
+function PostBeginPlay() {
+	//1.0秒ごとに特定の関数を呼ぶ bool値は繰り返し呼ぶかどうか
+	SetTimer(0.5, true, nameof(SetPC));
+	fcount = 0;
+}
+
+function SetPC(){
+	foreach WorldInfo.AllControllers(class'KFPlayerController', KFPC) {
+		if (KFPC.Pawn!=None) break;
+	}
+}
+
+function SendRestrictMessageString() {
+	fcount ++;
+	KFPC.TeamMessage(KFPC.PlayerReplicationInfo,"aaaあ:"$fcount,'Event');
+}
+	
+function SendRestrictMessageString2() {
+	fcount ++;
+	KFPC.TeamMessage(KFPC.PlayerReplicationInfo,"scale:"$fcount,'Event');
+}
+
+*/
+
+///////////////////////////////////////////PowerZeds///////////////////////////////////////////
+
+/**
+
+{
+	SpawnPowerZedSquad();
+	local array< class<KFPawn_Monster> > SQ;
+	local byte Curwave;
+	Curwave = MyKFGI.MyKFGRI.WaveNum;
+	if (KFPawn_ZedBloat(AIPawn)!=None) SQ.AddItem(class'PowerZeds_KFP_Bloat');
+	MyKFGI.SpawnManager.SpawnSquad(SQ);
+}
+
+function ModifyAI(Pawn AIPawn) {
+	//スーパーの処理
+		super.ModifyAI( AIPawn );
+	//一応モンスターか判別
+		if (KFPawn_Monster(AIPawn)==None) return;
+	//特定のZedをスポーン
+//		AIPawn = PowerZeds_KFP_Bloat(DynamicLoadObject("PowerZeds_KFP_Bloat", class'Class'));
+//		ReplaceToPowerZeds(AIPawn);
+	//
+}
+
+//パワーゼッドに置換
+function ReplaceToPowerZeds(Pawn AIPawn) {
+	local array< class<KFPawn_Monster> > SQ;
+//	if (KFPawn_ZedBloat(AIPawn)!=None) SQ.AddItem(class'PowerZeds_KFP_Bloat');
+	SQ.AddItem(class'PowerZeds_KFP_Bloat');
+	if (SQ.length>0) {
+		StackKillZed.AddItem(AIPawn);
+		SetTimer(1.0, false, nameof(TimerKillZed));
+		StackLocation.AddItem(AIPawn.Location);
+		MyKFGI.SpawnManager.SpawnSquad(SQ);
+	}else{
+		//置換しない場合はパワーゼッドか確認する
+		if (IsPowerZed(AIPawn)) {
+			AIPawn.SetLocation(GetStackLocation());
+		}
+	}
+}
+
+function vector GetStackLocation() {
+	local vector retvec;
+	retvec = StackLocation[0];
+	StackLocation.Remove(0,1);
+	return retvec;
+}
+
+function bool IsPowerZed(Pawn AIPawn) {
+	if (PowerZeds_KFP_Bloat(AIPawn)!=None) return true;
+	return false;
+}
+
+function TimerKillZed() {
+	local Pawn AIPawn;
+	foreach StackKillZed(AIPawn) {
+		AIPawn.Died(none,none,AIPawn.Location);
+	}
+	StackLocation.Remove(0,StackKillZed.length);
+}
+		KFPawn_ZedBloat.uc
+		KFPawn_ZedClot.uc
+		KFPawn_ZedClot_Alpha.uc
+		KFPawn_ZedClot_AlphaKing.uc
+		KFPawn_ZedClot_Cyst.uc
+		KFPawn_ZedClot_Slasher.uc
+		KFPawn_ZedCrawler.uc
+		KFPawn_ZedCrawlerKing.uc
+		KFPawn_ZedFleshpound.uc
+		KFPawn_ZedGorefast.uc
+		KFPawn_ZedGorefastDualBlade.uc
+		KFPawn_ZedHans.uc
+		KFPawn_ZedHusk.uc
+		KFPawn_ZedPatriarch.uc
+		KFPawn_ZedScrake.uc
+		KFPawn_ZedSiren.uc
+		KFPawn_ZedStalker.uc
+		local array< class<KFPawn_Monster> > SQ;
+			SQ.AddItem(class'PowerZeds_KFP_Bloat');
+	//			SQ.AddItem(class'KFPawn_ZedClot_Alpha_Versus');
+	//			SQ.AddItem(class'KFPawn_ZedClot_Slasher_Versus');
+	//			SQ.AddItem(class'KFPawn_ZedCrawler_Versus');
+	//			SQ.AddItem(class'KFPawn_ZedFleshPound_Versus');
+	//			SQ.AddItem(class'KFPawn_ZedGorefast_Versus');
+	//			SQ.AddItem(class'KFPawn_ZedScrake_Versus');
+	//			SQ.AddItem(class'KFPawn_ZedStalker_Versus');
+	//			SQ.AddItem(class'KFPawn_ZedSiren_Versus');
+	//			SQ.AddItem(class'KFPawn_ZedHusk_Versus');
+			MyKFGI.SpawnManager.SpawnSquad(SQ);
+		//
+}
+**/

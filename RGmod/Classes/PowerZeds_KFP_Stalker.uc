@@ -1,0 +1,1 @@
+class PowerZeds_KFP_Stalker extends KFPawn_ZedStalker_Versus;
