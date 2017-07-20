@@ -9,6 +9,7 @@
 //4.28 相変わらず鯖のラグはとれず とりあえずアーマーとグレの補充機能をつけてみる
 //5.16 制作開始からはや一ヶ月…今日も今日とて更新です traderdashつけてみた
 //6.03 トレーダー中のパーク変更し放題は無理でしたgg
+//7.20 namさんの要望で開始時のdosh変更を追加してみる
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
@@ -48,6 +49,7 @@ class RestrictPW extends KFMutator
 		var config bool bPlayer_SpawnWithFullGrenade;
 		var config bool bEnableTraderDash;
 		var config bool bDisableTeamCollisionWithTraderDash;
+		var config int StartingDosh;
 	/* Wave Settings */
 		var config byte MaxPlayer_TotalZedsCount;
 		var config byte MaxPlayer_ZedHealth;
@@ -196,6 +198,7 @@ class RestrictPW extends KFMutator
 			bPlayer_SpawnWithFullGrenade = false;
 			bEnableTraderDash = false;
 			bDisableTeamCollisionWithTraderDash = false;
+			StartingDosh = 0;
 		/* Wave Settings */
 			MaxPlayer_TotalZedsCount = 0;
 			MaxPlayer_ZedHealth = 0;
@@ -364,6 +367,7 @@ class RestrictPW extends KFMutator
 	function ModifyPlayer(Pawn Other) {
 		local KFPawn Player;
 		local KFPlayerController KFPC;
+		local KFPlayerReplicationInfo KFPRI;
 		local class<KFPerk> cKFP;
 		local class<Weapon> cRetW;
 		local Inventory Inv;
@@ -374,6 +378,7 @@ class RestrictPW extends KFMutator
 			Player = KFPawn_Human(Other);
 			KFPC = KFPlayerController(Player.Controller);
 			cKFP = KFPC.GetPerk().GetPerkClass();
+			KFPRI = KFPlayerReplicationInfo(Player.PlayerReplicationInfo);
 		//SpawnHumanPawnに関しては無視
 			if (IsBotPlayer(KFPC)) return;
 		//初期装備の変更先の情報を取得 変更される場合のみ処理
@@ -409,7 +414,16 @@ class RestrictPW extends KFMutator
 					SetTimer(0.25, false, nameof(FillArmorOrGrenades)); //呼び出しは1回なのでfalse
 				//
 			}
+		//開始時のDoshの設定
+			if (StartingDosh>0) {
+				SetTimer(0.25, false, nameof(SetStartingDosh)); //呼び出しは1回なのでfalse
+			}
 		//処理終了
+	}
+	
+	//StartingDoshの予約変更
+	function SetStartingDosh() {
+		KFPRI.Score = StartingDosh;
 	}
 	
 	//だんやくほじゅー
