@@ -89,6 +89,8 @@ class RestrictPW extends KFMutator
 		var bool bUseMaxMonsters;
 	//FillArmorOrGrenades アーマー・グレネードの予約補充用
 		var array<KFPawn_Human> PlayerToFillArmGre;
+	//StartingDosh予約補充用
+		var array<KFPlayerReplicationInfo> PlayerToChangeStartingDosh;
 	//RestrictMessage用
 		struct RestrictMessageInfo {
 			var KFPlayerController KFPC;
@@ -416,6 +418,7 @@ class RestrictPW extends KFMutator
 			}
 		//開始時のDoshの設定
 			if (StartingDosh>0) {
+				PlayerToChangeStartingDosh.AddItem(KFPRI);
 				SetTimer(0.25, false, nameof(SetStartingDosh)); //呼び出しは1回なのでfalse
 			}
 		//処理終了
@@ -423,7 +426,14 @@ class RestrictPW extends KFMutator
 	
 	//StartingDoshの予約変更
 	function SetStartingDosh() {
-		KFPRI.Score = StartingDosh;
+		local int i;
+		//変更対象者のリストを漁る
+			for (i=0;i<PlayerToChangeStartingDosh.length;++i) {
+				if (PlayerToChangeStartingDosh[i]!=None) {
+					PlayerToChangeStartingDosh[i].Score = StartingDosh;
+				}
+			}
+		//
 	}
 	
 	//だんやくほじゅー
