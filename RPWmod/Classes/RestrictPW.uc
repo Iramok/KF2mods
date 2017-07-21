@@ -433,6 +433,8 @@ class RestrictPW extends KFMutator
 					PlayerToChangeStartingDosh[i].Score = StartingDosh;
 				}
 			}
+		//—\–ñƒŠƒXƒg‚Ì‰Šú‰»
+			PlayerToChangeStartingDosh.Remove(0,PlayerToChangeStartingDosh.length);
 		//
 	}
 	
