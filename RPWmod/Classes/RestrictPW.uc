@@ -10,6 +10,8 @@
 //5.16 制作開始からはや一ヶ月…今日も今日とて更新です traderdashつけてみた
 //6.03 トレーダー中のパーク変更し放題は無理でしたgg
 //7.20 namさんの要望で開始時のdosh変更を追加してみる
+//9.15 かなり久々の更新 namさんの要望だったfakeplayersを追加してみる
+//9.16 WaveSizeFakesに名前を変更
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
@@ -54,6 +56,7 @@ class RestrictPW extends KFMutator
 		var config byte MaxPlayer_TotalZedsCount;
 		var config byte MaxPlayer_ZedHealth;
 		var config string MaxMonsters;
+		var config string WaveSizeFakes;
 		var config string SpawnTwoBossesName;
 		var config bool bFixZedHealth_6P;
 	/* */
@@ -78,6 +81,7 @@ class RestrictPW extends KFMutator
 		var array<byte> _MinPerkLevel_Survivalist;
 		var array<byte> _MinPerkLevel_Swat;
 		var array<int> _MaxMonsters;
+		var array<int> _WaveSizeFakes;
 	//SendRestrictMessageString用
 		var KFPlayerController RMPC;
 		var string RMStr;
@@ -85,8 +89,12 @@ class RestrictPW extends KFMutator
 		var array<string> aDisableWeapons,aDisableWeapons_Boss;
 	//CheckTraderState用
 		var bool bOpened;
-	//SetCustomMaxMonsters用
+	//MaxPlayer_TotalZedsCount用
+		var bool bUseMaxPlayer_TotalZedsCount;
+	//MaxMonsters用
 		var bool bUseMaxMonsters;
+	//WaveSizeFakes用
+		var bool bUseWaveSizeFakes;
 	//FillArmorOrGrenades アーマー・グレネードの予約補充用
 		var array<KFPawn_Human> PlayerToFillArmGre;
 	//StartingDosh予約補充用
@@ -205,6 +213,7 @@ class RestrictPW extends KFMutator
 			MaxPlayer_TotalZedsCount = 0;
 			MaxPlayer_ZedHealth = 0;
 			MaxMonsters = "";
+			WaveSizeFakes = "";
 			SpawnTwoBossesName = "";
 			bFixZedHealth_6P = false;
 		/* */
@@ -224,6 +233,7 @@ class RestrictPW extends KFMutator
 		InitDisableWeaponClass(DisableWeapons,aDisableWeapons);
 		InitDisableWeaponClass(DisableWeapons_Boss,aDisableWeapons_Boss);
 		SetArrayMM(_MaxMonsters,MaxMonsters);
+		SetArrayMM(_WaveSizeFakes,WaveSizeFakes);
 	}
 	
 	//InitVarFromConfigVarのサブ関数1
@@ -282,8 +292,12 @@ class RestrictPW extends KFMutator
 			InitVarFromConfigVar();
 		//CheckTraderState用
 			bOpened = true;
-		//SetCustomMaxMonsters用
+		//MaxPlayer_TotalZedsCount用
+			bUseMaxPlayer_TotalZedsCount = (MaxPlayer_TotalZedsCount>0);
+		//MaxMonsters用
 			bUseMaxMonsters = (MaxMonsters!="");
+		//WaveSizeFakes用
+			bUseWaveSizeFakes = (WaveSizeFakes!="");
 		//1.0秒ごとに特定の関数を呼ぶ bool値は繰り返し呼ぶかどうか
 			SetTimer(1.0, true, nameof(JudgePlayers));
 			SetTimer(0.25, true, nameof(CheckTraderState));
@@ -584,11 +598,13 @@ class RestrictPW extends KFMutator
 					JudgePlayers();
 					PlayerCount = MyKFGI.GetLivingPlayerCount();
 					if (PlayerCount>0) {
-						//人数過多の場合はTotalZedを減らす bosswave以外でのみ実行
-							if ( (MaxPlayer_TotalZedsCount>0) 
-								&& (PlayerCount>MaxPlayer_TotalZedsCount)
-								&& (MyKFGI.MyKFGRI.WaveNum<MyKFGI.MyKFGRI.WaveMax) ) {
-									SetCustomTotalAICount(PlayerCount);
+						//bosswave以外でのみ実行
+							if (MyKFGI.MyKFGRI.WaveNum<MyKFGI.MyKFGRI.WaveMax) {
+								//TotalZedを減らす
+									if (bUseMaxPlayer_TotalZedsCount) SetMaxPlayer_TotalZedsCount(PlayerCount);
+								//WaveSizeFakes
+									if (bUseWaveSizeFakes) SetWaveSizeFakes(PlayerCount);
+								//
 							}
 						//同時沸き数を変更
 							if (bUseMaxMonsters) SetCustomMaxMonsters(PlayerCount);
@@ -606,17 +622,37 @@ class RestrictPW extends KFMutator
 			bOpened = MyKFGI.MyKFGRI.bTraderIsOpen;
 		//
 	}
+	
+	//WaveSizeFakesの設定
+	function SetWaveSizeFakes(byte PlayerCount) {
+		local byte WSF;
+//		WSF = _WaveSizeFakes[min( PlayerCount-1+30, _WaveSizeFakes.length-1 )];
+//		SetCustomTotalAICount(PlayerCount+WSF,true);
+		WSF = _WaveSizeFakes[min( PlayerCount-1, _WaveSizeFakes.length-1 )];
+		if (WSF>0) {
+			SetCustomTotalAICount(PlayerCount+WSF,false);
+			SendRestrictMessageStringAll("::SetWaveSizeFakes "$WSF);
+		}
+	}
+	
+	//MaxPlayer_TotalZedsCountの設定 人数過多の場合減らす
+	function SetMaxPlayer_TotalZedsCount(byte PlayerCount) {
+		if (PlayerCount>MaxPlayer_TotalZedsCount) {
+			SetCustomTotalAICount(MaxPlayer_TotalZedsCount,true);
+		}
+	}
+
 	//ウェーブで沸くMOB数の調整 参考先 'KFAISpawnManager.uc' func: SetupNextWave
-	function SetCustomTotalAICount(byte PlayerCount) {
+	function SetCustomTotalAICount(byte PlayerCount,bool bOutPutLog) {
 		local int OldAIcount,AIcount;
 		OldAIcount = MyKFGI.SpawnManager.WaveTotalAI;
 		AIcount = 	MyKFGI.SpawnManager.WaveSettings.Waves[ MyKFGI.MyKFGRI.WaveNum-1 ].MaxAI *
-					MyKFGI.DifficultyInfo.GetPlayerNumMaxAIModifier( MaxPlayer_TotalZedsCount ) *
+					MyKFGI.DifficultyInfo.GetPlayerNumMaxAIModifier( PlayerCount ) *
 					MyKFGI.DifficultyInfo.GetDifficultyMaxAIModifier();
 		MyKFGI.SpawnManager.WaveTotalAI = AIcount;
 		MyKFGI.MyKFGRI.AIRemaining = AIcount;
 		MyKFGI.MyKFGRI.WaveTotalAICount = AIcount;
-		SendRestrictMessageStringAll("::SetTotalZedsCount "$OldAIcount$"->"$AIcount);
+		if (bOutPutLog) SendRestrictMessageStringAll("::SetTotalZedsCount "$OldAIcount$"->"$AIcount);
 	}
 	
 	//同時沸き数の調整
