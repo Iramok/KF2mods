@@ -12,6 +12,8 @@
 //7.20 namさんの要望で開始時のdosh変更を追加してみる
 //9.15 かなり久々の更新 namさんの要望だったfakeplayersを追加してみる
 //9.16 WaveSizeFakesに名前を変更
+//10.23 公式によるmaxmonstersの変更の煽りを受ける
+
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
