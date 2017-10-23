@@ -659,9 +659,23 @@ class RestrictPW extends KFMutator
 	function SetCustomMaxMonsters(byte PlayerCount) {
 		local int MaxZeds;
 		MaxZeds = min ( 255, _MaxMonsters[min( PlayerCount-1, _MaxMonsters.length-1 )] );
-		MyKFGI.SpawnManager.MaxMonstersSolo[int(MyKFGI.GameDifficulty)] = byte(MaxZeds);
-		MyKFGI.SpawnManager.MaxMonsters = byte(MaxZeds);
+//this is old ver
+//		MyKFGI.SpawnManager.MaxMonstersSolo[int(MyKFGI.GameDifficulty)] = byte(MaxZeds);
+//		MyKFGI.SpawnManager.MaxMonsters = byte(MaxZeds);
+//for v1056
+		SetMaxMonstersV1056(byte(MaxZeds));
+//
 		SendRestrictMessageStringAll("::SetMaxMonsters "$byte(MaxZeds));
+	}
+	
+	//MMの設定 - KFmutator_MaxplayersV2よりコピペ v1056より難易度・人数毎にMMができたようだ
+	function SetMaxMonstersV1056(byte mm_v1056) {
+		local int i,j;
+		for (i = 0; i < MyKFGI.SpawnManager.PerDifficultyMaxMonsters.length; i++) {
+			for (j = 0; j < MyKFGI.SpawnManager.PerDifficultyMaxMonsters[i].MaxMonsters.length ; j++) {
+				MyKFGI.SpawnManager.PerDifficultyMaxMonsters[i].MaxMonsters[j] = mm_v1056;
+			}
+		}
 	}
 	
 	//トレーダー開店及び閉店時のプレイヤーの状態の変更
