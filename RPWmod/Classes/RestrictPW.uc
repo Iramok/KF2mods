@@ -13,7 +13,7 @@
 //9.15 かなり久々の更新 namさんの要望だったfakeplayersを追加してみる
 //9.16 WaveSizeFakesに名前を変更
 //10.23 公式によるmaxmonstersの変更の煽りを受ける
-
+//10.25 2bossesを3bossesにしてみる
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
@@ -567,6 +567,7 @@ class RestrictPW extends KFMutator
 		local array<class<KFPawn_Monster> > SpawnList;
 		local array<String> SplitBuf;
 		local string Buf;
+		local byte rndbs;
 		if (SpawnTwoBossesName=="") {
 			MyKFGI.SpawnManager.TimeUntilNextSpawn = 0;
 			return;
@@ -574,14 +575,14 @@ class RestrictPW extends KFMutator
 		ParseStringIntoArray(SpawnTwoBossesName,SplitBuf,",",true);
 		foreach SplitBuf(Buf) {
 			if (Buf=="Rand") {
-				if (Rand(2)==0) {
-					Buf = "Hans";
-				}else{
-					Buf = "Pat";
-				}
+				rndbs = Rand(3);
+				if (rndbs==0) Buf = "Hans";
+				if (rndbs==1) Buf = "Pat";
+				if (rndbs==2) Buf = "KFP";
 			}
 			if (Buf=="Hans") SpawnList.AddItem(class'KFPawn_ZedHans');
 			if (Buf=="Pat") SpawnList.AddItem(class'KFPawn_ZedPatriarch');
+			if (Buf=="KFP") SpawnList.AddItem(class'KFPawn_ZedFleshpoundKing');
 //			SendRestrictMessageStringAll(Buf);
 		}
 		MyKFGI.NumAISpawnsQueued += MyKFGI.SpawnManager.SpawnSquad( SpawnList );
