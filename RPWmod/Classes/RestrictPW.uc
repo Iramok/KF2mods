@@ -14,6 +14,7 @@
 //9.16 WaveSizeFakesに名前を変更
 //10.23 公式によるmaxmonstersの変更の煽りを受ける
 //10.25 2bossesを3bossesにしてみる
+//10.29 proの要望でその場でトレーダー開けるようになった
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
@@ -52,6 +53,7 @@ class RestrictPW extends KFMutator
 		var config bool bPlayer_SpawnWithFullArmor;
 		var config bool bPlayer_SpawnWithFullGrenade;
 		var config bool bEnableTraderDash;
+		var config bool bEnableForceTraderOpen;
 		var config bool bDisableTeamCollisionWithTraderDash;
 		var config int StartingDosh;
 	/* Wave Settings */
@@ -117,6 +119,8 @@ class RestrictPW extends KFMutator
 		const VALUEFORDEAD = 10;
 	//ModifyTraderTimePlayerState用
 		const TraderGroundSpeed = 364364.0f;
+	//bEnableForceTraderOpen用	ナイフ装備による強制開店の周期
+		const CheckForceOpenTraderRate = 3.0f;
 	//
 	
 //<<---メッセージ関数--->>//
@@ -209,6 +213,7 @@ class RestrictPW extends KFMutator
 			bPlayer_SpawnWithFullArmor = false;
 			bPlayer_SpawnWithFullGrenade = false;
 			bEnableTraderDash = false;
+			bEnableForceTraderOpen = false;
 			bDisableTeamCollisionWithTraderDash = false;
 			StartingDosh = 0;
 		/* Wave Settings */
@@ -693,6 +698,7 @@ class RestrictPW extends KFMutator
 					}
 				}
 			}*/
+//
 		//トレーダーダッシュに関する設定
 			if (bEnableTraderDash) {
 				foreach WorldInfo.AllControllers(class'KFPlayerController', KFPC) {
@@ -702,8 +708,32 @@ class RestrictPW extends KFMutator
 					}
 				}
 			}
+		//強制開店の設定
+			if (bEnableForceTraderOpen) {
+				if (bOpenTrader) {
+					if (!bOpened) {
+						SetTimer(CheckForceOpenTraderRate, true, nameof(CheckForceOpenTrader));
+					}
+				}else{
+		 			ClearTimer(nameof(CheckForceOpenTrader));
+				}
+			}
 		//
 	}
+	
+	//強制開店 with KnifeOut
+	function CheckForceOpenTrader() {
+		local KFPlayerController KFPC;
+		local KFPawn Player;
+		foreach WorldInfo.AllControllers(class'KFPlayerController', KFPC) {
+			Player = KFPawn(KFPC.Pawn);
+			if ( (Player!=None) && (!IsBotPlayer(KFPC)) ) {
+				if (IsPlayerKnifeOut(Player)) {
+					KFPC.OpenTraderMenu();
+				}
+			}
+		}
+	}	
 	
 	//移動速度とコリジョンの変更
 	function SetCustomSpeedAndCollision(KFPawn Player,bool bOpenTrader) {
