@@ -53,7 +53,7 @@ class RestrictPW extends KFMutator
 		var config bool bPlayer_SpawnWithFullArmor;
 		var config bool bPlayer_SpawnWithFullGrenade;
 		var config bool bEnableTraderDash;
-		var config bool bEnableForceTraderOpen;
+		var config bool bEnableInstantTrader;
 		var config bool bDisableTeamCollisionWithTraderDash;
 		var config int StartingDosh;
 	/* Wave Settings */
@@ -119,8 +119,8 @@ class RestrictPW extends KFMutator
 		const VALUEFORDEAD = 10;
 	//ModifyTraderTimePlayerState用
 		const TraderGroundSpeed = 364364.0f;
-	//bEnableForceTraderOpen用	ナイフ装備による強制開店の周期
-		const CheckForceOpenTraderRate = 3.0f;
+	//bEnableInstantTrader用	ナイフ装備による強制開店の周期
+		const CheckForceOpenTraderRate = 4.0f;
 	//
 	
 //<<---メッセージ関数--->>//
@@ -213,7 +213,7 @@ class RestrictPW extends KFMutator
 			bPlayer_SpawnWithFullArmor = false;
 			bPlayer_SpawnWithFullGrenade = false;
 			bEnableTraderDash = false;
-			bEnableForceTraderOpen = false;
+			bEnableInstantTrader = false;
 			bDisableTeamCollisionWithTraderDash = false;
 			StartingDosh = 0;
 		/* Wave Settings */
@@ -709,7 +709,7 @@ class RestrictPW extends KFMutator
 				}
 			}
 		//強制開店の設定
-			if (bEnableForceTraderOpen) {
+			if (bEnableInstantTrader) {
 				if (bOpenTrader) {
 					if (!bOpened) {
 						SetTimer(CheckForceOpenTraderRate, true, nameof(CheckForceOpenTrader));
