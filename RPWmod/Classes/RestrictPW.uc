@@ -15,6 +15,7 @@
 //10.23 公式によるmaxmonstersの変更の煽りを受ける
 //10.25 2bossesを3bossesにしてみる
 //10.29 proの要望でその場でトレーダー開けるようになった
+//11.03 chatcommand実装！やったぜ！
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
@@ -53,7 +54,6 @@ class RestrictPW extends KFMutator
 		var config bool bPlayer_SpawnWithFullArmor;
 		var config bool bPlayer_SpawnWithFullGrenade;
 		var config bool bEnableTraderDash;
-		var config bool bEnableInstantTrader;
 		var config bool bDisableTeamCollisionWithTraderDash;
 		var config int StartingDosh;
 	/* Wave Settings */
@@ -119,8 +119,6 @@ class RestrictPW extends KFMutator
 		const VALUEFORDEAD = 10;
 	//ModifyTraderTimePlayerState用
 		const TraderGroundSpeed = 364364.0f;
-	//bEnableInstantTrader用	ナイフ装備による強制開店の周期
-		const CheckForceOpenTraderRate = 4.0f;
 	//
 	
 //<<---メッセージ関数--->>//
@@ -213,7 +211,6 @@ class RestrictPW extends KFMutator
 			bPlayer_SpawnWithFullArmor = false;
 			bPlayer_SpawnWithFullGrenade = false;
 			bEnableTraderDash = false;
-			bEnableInstantTrader = false;
 			bDisableTeamCollisionWithTraderDash = false;
 			StartingDosh = 0;
 		/* Wave Settings */
@@ -309,6 +306,7 @@ class RestrictPW extends KFMutator
 			SetTimer(1.0, true, nameof(JudgePlayers));
 			SetTimer(0.25, true, nameof(CheckTraderState));
 			SetTimer(1.0, true, nameof(CheckSpawnTwoBossSquad));
+			SetTimer(1.0, true, nameof(HackBroadcastHandler));
 		//
 	}
 	
@@ -708,32 +706,8 @@ class RestrictPW extends KFMutator
 					}
 				}
 			}
-		//強制開店の設定
-			if (bEnableInstantTrader) {
-				if (bOpenTrader) {
-					if (!bOpened) {
-						SetTimer(CheckForceOpenTraderRate, true, nameof(CheckForceOpenTrader));
-					}
-				}else{
-		 			ClearTimer(nameof(CheckForceOpenTrader));
-				}
-			}
 		//
 	}
-	
-	//強制開店 with KnifeOut
-	function CheckForceOpenTrader() {
-		local KFPlayerController KFPC;
-		local KFPawn Player;
-		foreach WorldInfo.AllControllers(class'KFPlayerController', KFPC) {
-			Player = KFPawn(KFPC.Pawn);
-			if ( (Player!=None) && (!IsBotPlayer(KFPC)) ) {
-				if (IsPlayerKnifeOut(Player)) {
-					KFPC.OpenTraderMenu();
-				}
-			}
-		}
-	}	
 	
 	//移動速度とコリジョンの変更
 	function SetCustomSpeedAndCollision(KFPawn Player,bool bOpenTrader) {
@@ -756,6 +730,7 @@ class RestrictPW extends KFMutator
 	}
 
 //<<---メイン関数(JudgePlayers)--->>//
+
 	
 	//プレイヤーに裁きを！
 	function JudgePlayers() {
@@ -866,5 +841,124 @@ class RestrictPW extends KFMutator
 		//
 		return false;
 	}
+
+
+
+//<<---チャットコマンド関連(JudgePlayers)--->>//
+
+	//chatの乗っ取り
+	function HackBroadcastHandler() {
+		if (RPWBroadcastHandler(MyKFGI.BroadcastHandler)==None) {
+			MyKFGI.BroadcastHandler = spawn(class'RPWBroadcastHandler');
+			RPWBroadcastHandler(MyKFGI.BroadcastHandler).InitRPWClass(Self);
+		 	ClearTimer(nameof(HackBroadcastHandler));
+		}
+	}
+	
+	//PRIからKFPCの取得
+	function KFPlayerController GetKFPCFromPRI(PlayerReplicationInfo PRI) {
+		return KFPlayerController(KFPlayerReplicationInfo(PRI).Owner);
+	}
+	
+	//chat内容のフック
+	function Broadcast(PlayerReplicationInfo SenderPRI,coerce string Msg) {
+		local string buf,MsgHead,MsgBody;
+		local array<String> splitbuf;
+		local byte cnt;
+		//split message:
+			ParseStringIntoArray(Msg,splitbuf," ",true);
+			foreach SplitBuf(Buf) {
+				if (cnt==0) MsgHead = Buf;
+				if (cnt==1) MsgBody = Buf;
+				cnt ++;
+			}
+		//メッセージ内容で分岐
+			switch(MsgHead) {
+				case "!OpenTrader":
+				case "!OT":
+					Broadcast_OpenTrader(GetKFPCFromPRI(SenderPRI));
+					break;
+				case "!WaveSizeFakes":
+					Broadcast_WaveSizeFakes(MsgBody);
+					break;
+				case "!RPWInfo":
+					Broadcast_RPWInfo(GetKFPCFromPRI(SenderPRI));
+					break;
+			}
+		//
+	}
+	
+	//!OpenTrader: 強制開店
+	function Broadcast_OpenTrader(KFPlayerController KFPC) {
+		if (MyKFGI.MyKFGRI.bTraderIsOpen) KFPC.OpenTraderMenu();
+	}
+	
+	//!WaveSizeFakes: WSFの機能の使用切り替え
+	function Broadcast_WaveSizeFakes(string Msg) {
+		if (Msg=="true") {
+			bUseWaveSizeFakes = true;
+			SendRestrictMessageStringAll("::WaveSizeFakes::Enable");
+		}
+		if (Msg=="false") {
+			bUseWaveSizeFakes = false;
+			SendRestrictMessageStringAll("::WaveSizeFakes::Disable");
+		}
+	}
+	
+	//!RPWInfo: RPWmodの情報
+	function Broadcast_RPWInfo(KFPlayerController KFPC) {
+		local string InfoBuf;
+		//情報の送信開始
+			SendRestrictMessageStringPC(KFPC,"RPWmod::RPWInfo");
+		//パークレベル
+			Broadcast_RPWInfo_AddPerkInfo(InfoBuf);
+			SendRestrictMessageStringPC(KFPC,InfoBuf);
+		//禁止武器
+			if (DisableWeapons!="") {
+				InfoBuf = "DisableWeap: ";
+				Broadcast_RPWInfo_AddWeapInfo(InfoBuf,aDisableWeapons);
+				SendRestrictMessageStringPC(KFPC,InfoBuf);
+			}
+		//禁止武器Boss
+			if (DisableWeapons_Boss!="") {
+				InfoBuf = "DisableWeap(Boss): ";
+				Broadcast_RPWInfo_AddWeapInfo(InfoBuf,aDisableWeapons_Boss);
+				SendRestrictMessageStringPC(KFPC,InfoBuf);
+			}
+		//複数ボスの名前
+			if (SpawnTwoBossesName!="") {
+				InfoBuf = "BossName: "$SpawnTwoBossesName;
+				SendRestrictMessageStringPC(KFPC,InfoBuf);
+			}
+		//
+	}
+	
+	//RPWInfoにパークレベルの情報を書き込み
+	function  Broadcast_RPWInfo_AddPerkInfo(out string InfoBuf) {
+		InfoBuf $= "MinPerkLevel(Normal,Bosswave): ";
+		InfoBuf $= "Zerk("$MinPerkLevel_Berserker$"),";
+		InfoBuf $= "Com("$MinPerkLevel_Commando$"),";
+		InfoBuf $= "Sup("$MinPerkLevel_Support$"),";
+		InfoBuf $= "Med("$MinPerkLevel_FieldMedic$"),";
+		InfoBuf $= "Demo("$MinPerkLevel_Demolitionist$"),";
+		InfoBuf $= "Bug("$MinPerkLevel_Firebug$"),";
+		InfoBuf $= "GS("$MinPerkLevel_Gunslinger$"),";
+		InfoBuf $= "SS("$MinPerkLevel_Sharpshooter$"),";
+		InfoBuf $= "Suv("$MinPerkLevel_Survivalist$"),";
+		InfoBuf $= "Swat("$MinPerkLevel_Swat$")";
+	}
+	
+	//RPWInfoに武器の名前を書く
+	function  Broadcast_RPWInfo_AddWeapInfo(out string InfoBuf,array<string> aWeapName) {
+		local string WName;
+		local bool nl; //new line
+		nl = false;
+		foreach aWeapName(WName) {
+			if (nl) InfoBuf $= ",";
+			InfoBuf $= WName;
+			nl = true;
+		}
+	}
+	
 	
 /////////////////////////////////////////<<---EOF--->>/////////////////////////////////////////
