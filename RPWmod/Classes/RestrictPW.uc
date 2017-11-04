@@ -914,30 +914,30 @@ class RestrictPW extends KFMutator
 			SendRestrictMessageStringAll("::RPWInfo");
 		//パークレベル
 			Broadcast_RPWInfo_AddPerkInfo(InfoBuf);
-			SendRestrictMessageStringAll(InfoBuf);
+			SendRestrictMessageStringAll("::"$InfoBuf);
 		//禁止武器
 			if (DisableWeapons!="") {
-				InfoBuf = "DisableWeap: ";
+				InfoBuf = "DisableWeap//";
 				Broadcast_RPWInfo_AddWeapInfo(InfoBuf,aDisableWeapons);
-				SendRestrictMessageStringAll(InfoBuf);
+				SendRestrictMessageStringAll("::"$InfoBuf);
 			}
 		//禁止武器Boss
 			if (DisableWeapons_Boss!="") {
-				InfoBuf = "DisableWeap(Boss): ";
+				InfoBuf = "DisableWeap(Boss)//";
 				Broadcast_RPWInfo_AddWeapInfo(InfoBuf,aDisableWeapons_Boss);
-				SendRestrictMessageStringAll(InfoBuf);
+				SendRestrictMessageStringAll("::"$InfoBuf);
 			}
 		//複数ボスの名前
 			if (SpawnTwoBossesName!="") {
-				InfoBuf = "BossName: "$SpawnTwoBossesName;
-				SendRestrictMessageStringAll(InfoBuf);
+				InfoBuf = "BossName//"$SpawnTwoBossesName;
+				SendRestrictMessageStringAll("::"$InfoBuf);
 			}
 		//
 	}
 	
 	//RPWInfoにパークレベルの情報を書き込み
 	function  Broadcast_RPWInfo_AddPerkInfo(out string InfoBuf) {
-		InfoBuf $= "MinPerkLevel(Normal,Bosswave): ";
+		InfoBuf $= "MinPerkLevel(Normal,Bosswave)//";
 		InfoBuf $= "Zerk("$MinPerkLevel_Berserker$"),";
 		InfoBuf $= "Com("$MinPerkLevel_Commando$"),";
 		InfoBuf $= "Sup("$MinPerkLevel_Support$"),";
@@ -964,7 +964,7 @@ class RestrictPW extends KFMutator
 	
 	//スペシャルな何かを実装する・・・かも？
 	function Broadcast_Special() {
-		SendRestrictMessageStringAll("はにゃあーっ？！");
+		SendRestrictMessageStringAll("::はにゃあーっ？！");
 		//はわわわ、びっくりしたのです！
 	}
 	
