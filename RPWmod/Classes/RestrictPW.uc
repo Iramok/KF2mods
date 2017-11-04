@@ -160,7 +160,6 @@ class RestrictPW extends KFMutator
 		addbuf.Msg = s;
 		RMI.AddItem(addbuf);
 		SetTimer(0.5, false, nameof(SendReserveRestrictMessageTimer));
-		
 	}
 	
 	//タイマーによるメッセージの発行
@@ -876,13 +875,16 @@ class RestrictPW extends KFMutator
 			switch(MsgHead) {
 				case "!OpenTrader":
 				case "!OT":
-					Broadcast_OpenTrader(GetKFPCFromPRI(SenderPRI));
+					if (MsgBody=="") Broadcast_OpenTrader(GetKFPCFromPRI(SenderPRI));
 					break;
 				case "!WaveSizeFakes":
 					Broadcast_WaveSizeFakes(MsgBody);
 					break;
 				case "!RPWInfo":
-					Broadcast_RPWInfo(GetKFPCFromPRI(SenderPRI));
+					if (MsgBody=="") Broadcast_RPWInfo();
+					break;
+				case "!hawawa":
+					if (MsgBody=="") Broadcast_Special();
 					break;
 			}
 		//
@@ -906,29 +908,29 @@ class RestrictPW extends KFMutator
 	}
 	
 	//!RPWInfo: RPWmodの情報
-	function Broadcast_RPWInfo(KFPlayerController KFPC) {
+	function Broadcast_RPWInfo() {
 		local string InfoBuf;
 		//情報の送信開始
-			SendRestrictMessageStringPC(KFPC,"RPWmod::RPWInfo");
+			SendRestrictMessageStringAll("::RPWInfo");
 		//パークレベル
 			Broadcast_RPWInfo_AddPerkInfo(InfoBuf);
-			SendRestrictMessageStringPC(KFPC,InfoBuf);
+			SendRestrictMessageStringAll(InfoBuf);
 		//禁止武器
 			if (DisableWeapons!="") {
 				InfoBuf = "DisableWeap: ";
 				Broadcast_RPWInfo_AddWeapInfo(InfoBuf,aDisableWeapons);
-				SendRestrictMessageStringPC(KFPC,InfoBuf);
+				SendRestrictMessageStringAll(InfoBuf);
 			}
 		//禁止武器Boss
 			if (DisableWeapons_Boss!="") {
 				InfoBuf = "DisableWeap(Boss): ";
 				Broadcast_RPWInfo_AddWeapInfo(InfoBuf,aDisableWeapons_Boss);
-				SendRestrictMessageStringPC(KFPC,InfoBuf);
+				SendRestrictMessageStringAll(InfoBuf);
 			}
 		//複数ボスの名前
 			if (SpawnTwoBossesName!="") {
 				InfoBuf = "BossName: "$SpawnTwoBossesName;
-				SendRestrictMessageStringPC(KFPC,InfoBuf);
+				SendRestrictMessageStringAll(InfoBuf);
 			}
 		//
 	}
@@ -958,6 +960,12 @@ class RestrictPW extends KFMutator
 			InfoBuf $= WName;
 			nl = true;
 		}
+	}
+	
+	//スペシャルな何かを実装する・・・かも？
+	function Broadcast_Special() {
+		SendRestrictMessageStringAll("はにゃあーっ？！");
+		//はわわわ、びっくりしたのです！
 	}
 	
 	
