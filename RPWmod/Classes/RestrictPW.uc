@@ -63,6 +63,8 @@ class RestrictPW extends KFMutator
 		var config string WaveSizeFakes;
 		var config string SpawnTwoBossesName;
 		var config bool bFixZedHealth_6P;
+	/* ChatCommand Settings */
+		var config bool bDisableChatCommand_OpenTrader;
 	/* */
 
 //<<---global•Ï”‚Ì’è‹`--->>//
@@ -219,6 +221,8 @@ class RestrictPW extends KFMutator
 			WaveSizeFakes = "";
 			SpawnTwoBossesName = "";
 			bFixZedHealth_6P = false;
+		/* ChatCommand Settings */
+			bDisableChatCommand_OpenTrader = false;
 		/* */
 	}
 	
@@ -875,6 +879,7 @@ class RestrictPW extends KFMutator
 			switch(MsgHead) {
 				case "!OpenTrader":
 				case "!OT":
+					if (bDisableChatCommand_OpenTrader) return;
 					if (MsgBody=="") Broadcast_OpenTrader(GetKFPCFromPRI(SenderPRI));
 					break;
 				case "!WaveSizeFakes":
