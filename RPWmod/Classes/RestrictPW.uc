@@ -1150,7 +1150,7 @@ class RestrictPW extends KFMutator
 		nonemeg = (Msg=="");
 		switch (Msg) {
 			case "=o":
-				SendRestrictMessageStringAll("::ふあーーっ！？");
+				SendRestrictMessageStringAll("::ふにゃあーーっ？！");
 				break;
 			case ":o":
 				SendRestrictMessageStringAll("::はわわわ、びっくりしたのです！");
