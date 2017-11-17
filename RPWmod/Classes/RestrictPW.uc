@@ -16,6 +16,7 @@
 //10.25 2bossesを3bossesにしてみる
 //10.29 proの要望でその場でトレーダー開けるようになった
 //11.03 chatcommand実装！やったぜ！
+//11.10 コンソールメッセージがサーバーでは動かなかった どうせ日本語表示されないしいいか :o
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
@@ -36,6 +37,7 @@ class RestrictPW extends KFMutator
 		var config string MinPerkLevel_Sharpshooter;
 		var config string MinPerkLevel_Survivalist;
 		var config string MinPerkLevel_Swat;
+		var config string DisablePerkSkills;
 	/* Weapon Settings */
 		var config string StartingWeapons_Berserker;
 		var config string StartingWeapons_Commando;
@@ -88,6 +90,9 @@ class RestrictPW extends KFMutator
 		var array<byte> _MinPerkLevel_Swat;
 		var array<int> _MaxMonsters;
 		var array<int> _WaveSizeFakes;
+	//DisablePerkSkills用
+		var array<int> aDisablePerkSkills;
+		var bool bUseDisablePerkSkills;
 	//SendRestrictMessageString用
 		var KFPlayerController RMPC;
 		var string RMStr;
@@ -121,6 +126,17 @@ class RestrictPW extends KFMutator
 		const VALUEFORDEAD = 10;
 	//ModifyTraderTimePlayerState用
 		const TraderGroundSpeed = 364364.0f;
+	//GetPerkClassFromPerkCode用
+		const PerkCode_Berserker = 0;
+		const PerkCode_Commando = 1;
+		const PerkCode_Support = 2;
+		const PerkCode_FieldMedic = 3;
+		const PerkCode_Demolitionist = 4;
+		const PerkCode_Firebug = 5;
+		const PerkCode_Gunslinger = 6;
+		const PerkCode_Sharpshooter = 7;
+		const PerkCode_Survivalist = 8;
+		const PerkCode_Swat = 9;
 	//
 	
 //<<---メッセージ関数--->>//
@@ -175,8 +191,32 @@ class RestrictPW extends KFMutator
 			RMI.Remove(0,RMI.length);
 		//
 	}
-		
 	
+	//コンソールへメッセージを送信要請
+	function SendRestrictMessageStringConsoleAll(string s) {
+//		SendConsoleMessage("RPWmod"$s);
+		SendConsoleMessage(s);
+	}
+	
+	//コンソールへ空のメッセージを送信要請
+	function SendEmptyMessageStringConsoleAll() {
+		SendConsoleMessage("");
+	}
+	
+	//コンソールへメッセージを送信・・・したかったがまた今度
+	reliable client function SendConsoleMessage(string s) {
+		SendRestrictMessageStringAll(s);
+/*
+		local KFGameViewportClient GVC;
+		local KFPlayerController KFPC;
+		local RPWPlayerController RPWPC;
+		foreach WorldInfo.AllControllers(class'KFPlayerController', KFPC) {
+			GVC = class'GameEngine'.static.GetEngine().GameViewport;
+			LocalPlayer(KFPC.Player).ViewportClient.ViewportConsole.OutputText(s);
+		}
+*/
+	}
+
 
 //<<---初期化関数--->>//
 
@@ -194,6 +234,7 @@ class RestrictPW extends KFMutator
 			MinPerkLevel_Sharpshooter = "0,0";
 			MinPerkLevel_Survivalist = "0,0";
 			MinPerkLevel_Swat = "0,0";
+			DisablePerkSkills = "";
 		/* Weapon Settings */
 			StartingWeapons_Berserker = "";
 			StartingWeapons_Commando = "";
@@ -226,6 +267,7 @@ class RestrictPW extends KFMutator
 		/* */
 	}
 	
+	//config変数から内部で保持しておく変数への変換
 	function InitVarFromConfigVar() {
 		SetArrayMPL(_MinPerkLevel_Berserker		,MinPerkLevel_Berserker		);
 		SetArrayMPL(_MinPerkLevel_Commando		,MinPerkLevel_Commando		);
@@ -237,10 +279,23 @@ class RestrictPW extends KFMutator
 		SetArrayMPL(_MinPerkLevel_Sharpshooter	,MinPerkLevel_Sharpshooter	);
 		SetArrayMPL(_MinPerkLevel_Survivalist	,MinPerkLevel_Survivalist)	;
 		SetArrayMPL(_MinPerkLevel_Swat			,MinPerkLevel_Swat			);
+		InitDisablePerkSkills(DisablePerkSkills,aDisablePerkSkills);
 		InitDisableWeaponClass(DisableWeapons,aDisableWeapons);
 		InitDisableWeaponClass(DisableWeapons_Boss,aDisableWeapons_Boss);
 		SetArrayMM(_MaxMonsters,MaxMonsters);
 		SetArrayMM(_WaveSizeFakes,WaveSizeFakes);
+	}
+	
+	//InitVarFromConfigVarのサブ関数0
+	function InitDisablePerkSkills(string DPS,out array<int> aDPS) {
+		local string buf;
+		local array<String> splitbuf;
+		if ( DPS == "" ) return;
+		bUseDisablePerkSkills = true;
+		ParseStringIntoArray(DPS,splitbuf,",",true);
+		foreach splitbuf(buf) {
+			aDPS.AddItem(int(buf));
+		}
 	}
 	
 	//InitVarFromConfigVarのサブ関数1
@@ -745,7 +800,7 @@ class RestrictPW extends KFMutator
 			eWT =  ( MyKFGI.MyKFGRI.WaveNum < MyKFGI.MyKFGRI.WaveMax - ( MyKFGI.MyKFGRI.bTraderIsOpen ? 1 : 0 ) ) ? WaveType_Normal : WaveType_Boss;
 		//全PCに対して判定 SpawnHumanPawnに関しては無視
 			foreach WorldInfo.AllControllers(class'KFPlayerController', KFPC) {
-				if (!IsBotPlayer(KFPC)) {
+				if ( (KFPC!=None) && (!IsBotPlayer(KFPC)) ) {
 					JudgeSpecificPlayer(KFPC,eWT);
 				}
 			}
@@ -768,13 +823,14 @@ class RestrictPW extends KFMutator
 				SendRestrictMessageString();
 				CurWeapon.Destroyed();
 			}
-		//パークのレベル制限にひっかかっている トレーダーが開いているならHPを減らす そうでなければ殺す
-			if (IsPerkLevelRestricted(KFPC.GetPerk().GetPerkClass(), KFPC.GetPerk().GetLevel(),eWT )) {
+		//パークのレベル制限orスキル制限	トレーダーが開いているならHPを減らす そうでなければ殺す
+			if ( IsPerkLevelRestricted(KFPC.GetPerk().GetPerkClass(), KFPC.GetPerk().GetLevel(),eWT)
+																|| IsUsingRestrictedPerkSkill(KFPC,eWT) ) {
 				if (MyKFGI.MyKFGRI.bTraderIsOpen) {
 					Player.Health = max(Player.Health-VALUEFORDEAD,1);
 				}else if (Player.Health>=0) {
 					SendRestrictMessageString();
-					player.FellOutOfWorld(none);
+					Player.FellOutOfWorld(none);
 				}
 			}
 		//
@@ -844,10 +900,67 @@ class RestrictPW extends KFMutator
 		//
 		return false;
 	}
+	
+	//使用禁止スキルを使っているかどうか
+	function bool IsUsingRestrictedPerkSkill(KFPlayerController KFPC,eWaveType eWT) {
+		local int val,wavecodeongame,PerkCode,SkillCode,WaveCode;
+		local string skillinfo;
+		if (!bUseDisablePerkSkills) return false;
+		if (eWT==WaveType_Normal) wavecodeongame = 0;
+		if (eWT==WaveType_Boss) wavecodeongame = 1;
+		foreach aDisablePerkSkills(val) {
+			PerkCode	= (val/100)	%10;
+			SkillCode	= (val/10)	%10;
+			WaveCode	= (val)		%10;
+			//PerkCode SkillCode WaveCode
+			if ( ( GetPerkClassFromPerkCode(PerkCode) == KFPC.GetPerk().GetPerkClass() ) &&
+				 ( KFPC.GetPerk().PerkSkills[SkillCode].bActive ) &&
+				 ( WaveCode == wavecodeongame ) ) {
+				skillinfo = GetSkillInfo(KFPC.GetPerk().GetPerkClass(),SkillCode);
+				SetRestrictMessageString("::FellOutOfWorld::"$skillinfo$"::RestrictedSkill");
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	//スキルの情報
+	function string GetSkillInfo(class<KFPerk> Perk,byte SkillCode) {
+		local string AdditionalInfo;
+		AdditionalInfo = "(Lv"$(5*((SkillCode/2)+1));
+		AdditionalInfo $= ( SkillCode%2 == 0 ) ? "L" : "R";
+		AdditionalInfo $= ")";
+		return ( Perk.default.PerkSkills[SkillCode].Name $ AdditionalInfo );
+	}
+	
+	//PerkCodeからPerkクラスを取得
+	function class<KFPerk> GetPerkClassFromPerkCode(byte pcode) {
+		switch(pcode) {
+			case PerkCode_Berserker:
+				return class'KFPerk_Berserker';
+			case PerkCode_Commando:
+				return class'KFPerk_Commando';
+			case PerkCode_Support:
+				return class'KFPerk_Support';
+			case PerkCode_FieldMedic:
+				return class'KFPerk_FieldMedic';
+			case PerkCode_Demolitionist:
+				return class'KFPerk_Demolitionist';
+			case PerkCode_Firebug:
+				return class'KFPerk_Firebug';
+			case PerkCode_Gunslinger:
+				return class'KFPerk_Gunslinger';
+			case PerkCode_Sharpshooter:
+				return class'KFPerk_Sharpshooter';
+			case PerkCode_Survivalist:
+				return class'KFPerk_Survivalist';
+			case PerkCode_Swat:
+				return class'KFPerk_Swat';
+		}
+	}
+	
 
-
-
-//<<---チャットコマンド関連(JudgePlayers)--->>//
+//<<---チャットコマンド関連(ChatCommands)--->>//
 
 	//chatの乗っ取り
 	function HackBroadcastHandler() {
@@ -877,6 +990,9 @@ class RestrictPW extends KFMutator
 			}
 		//メッセージ内容で分岐
 			switch(MsgHead) {
+				case "!rpwdebug":
+					Broadcast_Debug(GetKFPCFromPRI(SenderPRI));
+					break;
 				case "!OpenTrader":
 				case "!OT":
 					if (bDisableChatCommand_OpenTrader) return;
@@ -889,10 +1005,14 @@ class RestrictPW extends KFMutator
 					if (MsgBody=="") Broadcast_RPWInfo();
 					break;
 				case "!hawawa":
-					if (MsgBody=="") Broadcast_Special();
+					Broadcast_Special(MsgBody);
 					break;
 			}
 		//
+	}
+	
+	//!rpwdebug: mod作成補助
+	function Broadcast_Debug(KFPlayerController KFPC) {
 	}
 	
 	//!OpenTrader: 強制開店
@@ -916,47 +1036,104 @@ class RestrictPW extends KFMutator
 	function Broadcast_RPWInfo() {
 		local string InfoBuf;
 		//情報の送信開始
-			SendRestrictMessageStringAll("::RPWInfo");
+//			SendRestrictMessageStringAll("::RPWInfo in console.");
+//			SendEmptyMessageStringConsoleAll();
+			SendRestrictMessageStringConsoleAll("::RPWInfo");
 		//パークレベル
+			InfoBuf $= "MinPerkLevel(1w-10w,Boss)// ";
 			Broadcast_RPWInfo_AddPerkInfo(InfoBuf);
-			SendRestrictMessageStringAll("::"$InfoBuf);
+			SendRestrictMessageStringConsoleAll("::"$InfoBuf);
+		//禁止スキル
+			if (bUseDisablePerkSkills) {
+				InfoBuf = "DisableSkills// ";
+				Broadcast_RPWInfo_AddSkillsInfo(InfoBuf);
+				SendRestrictMessageStringConsoleAll("::"$InfoBuf);
+			}
 		//禁止武器
 			if (DisableWeapons!="") {
-				InfoBuf = "DisableWeap//";
+				InfoBuf = "DisableWeap// ";
 				Broadcast_RPWInfo_AddWeapInfo(InfoBuf,aDisableWeapons);
-				SendRestrictMessageStringAll("::"$InfoBuf);
+				SendRestrictMessageStringConsoleAll("::"$InfoBuf);
 			}
 		//禁止武器Boss
 			if (DisableWeapons_Boss!="") {
-				InfoBuf = "DisableWeap(Boss)//";
+				InfoBuf = "DisableWeap(Boss)// ";
 				Broadcast_RPWInfo_AddWeapInfo(InfoBuf,aDisableWeapons_Boss);
-				SendRestrictMessageStringAll("::"$InfoBuf);
+				SendRestrictMessageStringConsoleAll("::"$InfoBuf);
 			}
 		//複数ボスの名前
 			if (SpawnTwoBossesName!="") {
-				InfoBuf = "BossName//"$SpawnTwoBossesName;
-				SendRestrictMessageStringAll("::"$InfoBuf);
+				InfoBuf = "BossName// "$SpawnTwoBossesName;
+				SendRestrictMessageStringConsoleAll("::"$InfoBuf);
 			}
 		//
 	}
 	
 	//RPWInfoにパークレベルの情報を書き込み
-	function  Broadcast_RPWInfo_AddPerkInfo(out string InfoBuf) {
-		InfoBuf $= "MinPerkLevel(Normal,Bosswave)//";
-		InfoBuf $= "Zerk("$MinPerkLevel_Berserker$"),";
-		InfoBuf $= "Com("$MinPerkLevel_Commando$"),";
-		InfoBuf $= "Sup("$MinPerkLevel_Support$"),";
-		InfoBuf $= "Med("$MinPerkLevel_FieldMedic$"),";
-		InfoBuf $= "Demo("$MinPerkLevel_Demolitionist$"),";
-		InfoBuf $= "Bug("$MinPerkLevel_Firebug$"),";
-		InfoBuf $= "GS("$MinPerkLevel_Gunslinger$"),";
-		InfoBuf $= "SS("$MinPerkLevel_Sharpshooter$"),";
-		InfoBuf $= "Suv("$MinPerkLevel_Survivalist$"),";
-		InfoBuf $= "Swat("$MinPerkLevel_Swat$")";
+	function Broadcast_RPWInfo_AddPerkInfo(out string InfoBuf) {
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Berserker)		$"("$MinPerkLevel_Berserker$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Commando)		$"("$MinPerkLevel_Commando$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Support)		$"("$MinPerkLevel_Support$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_FieldMedic)		$"("$MinPerkLevel_FieldMedic$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Demolitionist)	$"("$MinPerkLevel_Demolitionist$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Firebug)		$"("$MinPerkLevel_Firebug$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Gunslinger)		$"("$MinPerkLevel_Gunslinger$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Sharpshooter)	$"("$MinPerkLevel_Sharpshooter$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Survivalist)	$"("$MinPerkLevel_Survivalist$") ";
+		InfoBuf $= GetPerkNameFromPerkCode(PerkCode_Swat)			$"("$MinPerkLevel_Swat$") ";
+	}
+	
+	//PerkCodeから（独自の）パークの名前を取得
+	function string GetPerkNameFromPerkCode(int PerkCode) {
+		switch(PerkCode) {
+			case PerkCode_Berserker:
+				return "Zerk";
+			case PerkCode_Commando:
+				return "Com";
+			case PerkCode_Support:
+				return "Sup";
+			case PerkCode_FieldMedic:
+				return "Med";
+			case PerkCode_Demolitionist:
+				return "Demo";
+			case PerkCode_Firebug:
+				return "Bug";
+			case PerkCode_Gunslinger:
+				return "GS";
+			case PerkCode_Sharpshooter:
+				return "SS";
+			case PerkCode_Survivalist:
+				return "Suv";
+			case PerkCode_Swat:
+				return "Swat";
+		}
+		return "NullPerk?[ERROR@GetPerkNameFromPerkCode]";
+	}
+
+	//RPWInfoに禁止スキルの情報を書き込み
+	function Broadcast_RPWInfo_AddSkillsInfo(out string InfoBuf) {
+		local bool nl; //new line
+		local int val,PerkCode,SkillCode,WaveCode;
+		nl = false;
+		foreach aDisablePerkSkills(val) {
+			//前準備
+				PerkCode	= (val/100)	%10;
+				SkillCode	= (val/10)	%10;
+				WaveCode	= (val)		%10;
+			//Info書き込み
+				if (nl) InfoBuf $= " ";
+//				InfoBuf $= "[";
+				InfoBuf $= GetPerkNameFromPerkCode(PerkCode)$"[";
+				InfoBuf $= GetSkillInfo(GetPerkClassFromPerkCode(PerkCode),SkillCode)$"]";
+				if (wavecode==1) InfoBuf $= "(Boss)";
+//				InfoBuf $= "]";
+			//
+			nl = true;
+		}
 	}
 	
 	//RPWInfoに武器の名前を書く
-	function  Broadcast_RPWInfo_AddWeapInfo(out string InfoBuf,array<string> aWeapName) {
+	function Broadcast_RPWInfo_AddWeapInfo(out string InfoBuf,array<string> aWeapName) {
 		local string WName;
 		local bool nl; //new line
 		nl = false;
@@ -967,11 +1144,55 @@ class RestrictPW extends KFMutator
 		}
 	}
 	
-	//スペシャルな何かを実装する・・・かも？
-	function Broadcast_Special() {
-		SendRestrictMessageStringAll("::はにゃあーっ？！");
-		//はわわわ、びっくりしたのです！
+	//!hawawa: スペシャルな何かを実装する・・・かも？
+	function Broadcast_Special(string Msg) {
+		local bool nonemeg;
+		nonemeg = (Msg=="");
+		switch (Msg) {
+			case "=o":
+				SendRestrictMessageStringAll("::ふあーーっ！？");
+				break;
+			case ":o":
+				SendRestrictMessageStringAll("::はわわわ、びっくりしたのです！");
+				break;
+			default:
+				if (nonemeg) {
+					SendRestrictMessageStringAll("::はにゃあーっ？！");
+				}else{
+					SendRestrictMessageStringAll("::そんな装備で大丈夫なのです？");
+				}
+				break;
+		}
 	}
+
+/*
+
+	case "!dappun":
+		if (MsgBody=="") Broadcast_Puke(GetKFPCFromPRI(SenderPRI));
+		break;		
 	
+	//!dappun: お遊び その2
+	function Broadcast_Puke(KFPlayerController KFPC) {
+		local KFPawn_Human KFPH;
+		local byte i,MineNum;
+		local float ExplodeTimer;
+		local rotator DPMR; //DeathPukeMineRotations_Mine
+		local KFProjectile PukeMine;
+		KFPH = KFPawn_Human(KFPC.Pawn);
+		MineNum = 5;
+		ExplodeTimer = 5.0f;
+		for (i=0;i<MineNum;++i) {
+			DPMR.Pitch = 8190;
+			DPMR.Yaw = (2*32768)*i/MineNum-32768;
+			DPMR.Roll = 0;
+			PukeMine = Spawn(class'RPWPukeMine', KFPH,, KFPH.Location, DPMR,, true);
+			if( PukeMine != none ) {
+				PukeMine.Init( vector(DPMR) );
+			}
+			RPWPukeMine(PukeMine).SetExplodeTimer(ExplodeTimer);
+		}
+		SendRestrictMessageStringAll("::糞まみれになろうや。");
+	}
+*/
 	
 /////////////////////////////////////////<<---EOF--->>/////////////////////////////////////////

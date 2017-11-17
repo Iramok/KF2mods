@@ -9,8 +9,10 @@ function InitRPWClass(RestrictPW NewRPW) {
 function BroadcastText( PlayerReplicationInfo SenderPRI, PlayerController Receiver, coerce string Msg, optional name Type ) {
 	super.BroadcastText(SenderPRI,Receiver,Msg,Type);
 	if (MyRPW!=None) {
-		if (PlayerController(SenderPRI.Owner)==Receiver) {
-			MyRPW.Broadcast(SenderPRI,Msg);
+		if (SenderPRI!=None) {
+			if (PlayerController(SenderPRI.Owner)==Receiver) {
+				MyRPW.Broadcast(SenderPRI,Msg);
+			}
 		}
 	}
 }
