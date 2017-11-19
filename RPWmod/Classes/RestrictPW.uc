@@ -67,6 +67,7 @@ class RestrictPW extends KFMutator
 		var config bool bFixZedHealth_6P;
 	/* ChatCommand Settings */
 		var config bool bDisableChatCommand_OpenTrader;
+		var config bool bDontShowOpentraderCommandInChat;
 	/* */
 
 //<<---global変数の定義--->>//
@@ -264,6 +265,7 @@ class RestrictPW extends KFMutator
 			bFixZedHealth_6P = false;
 		/* ChatCommand Settings */
 			bDisableChatCommand_OpenTrader = false;
+			bDontShowOpentraderCommandInChat = false;
 		/* */
 	}
 	
@@ -976,18 +978,14 @@ class RestrictPW extends KFMutator
 		return KFPlayerController(KFPlayerReplicationInfo(PRI).Owner);
 	}
 	
-	//chat内容のフック
+	//chat内容のフック 返り値はそのテキストを非表示にするかどうか
 	function Broadcast(PlayerReplicationInfo SenderPRI,coerce string Msg) {
-		local string buf,MsgHead,MsgBody;
+		local string MsgHead,MsgBody;
 		local array<String> splitbuf;
-		local byte cnt;
 		//split message:
 			ParseStringIntoArray(Msg,splitbuf," ",true);
-			foreach SplitBuf(Buf) {
-				if (cnt==0) MsgHead = Buf;
-				if (cnt==1) MsgBody = Buf;
-				cnt ++;
-			}
+			MsgHead = splitbuf[0];
+			MsgBody = splitbuf[1];
 		//メッセージ内容で分岐
 			switch(MsgHead) {
 				case "!rpwdebug":
@@ -995,7 +993,7 @@ class RestrictPW extends KFMutator
 					break;
 				case "!OpenTrader":
 				case "!OT":
-					if (bDisableChatCommand_OpenTrader) return;
+					if (bDisableChatCommand_OpenTrader) break;
 					if (MsgBody=="") Broadcast_OpenTrader(GetKFPCFromPRI(SenderPRI));
 					break;
 				case "!WaveSizeFakes":
@@ -1008,6 +1006,25 @@ class RestrictPW extends KFMutator
 					Broadcast_Special(MsgBody);
 					break;
 			}
+		//
+	}
+	
+	function bool StopBroadcast(string Msg) {
+		local string MsgHead,MsgBody;
+		local array<String> splitbuf;
+		//split message:
+			ParseStringIntoArray(Msg,splitbuf," ",true);
+			MsgHead = splitbuf[0];
+			MsgBody = splitbuf[1];
+		//"!opentrader"と"!ot"の消去
+			switch(MsgHead) {
+				case "!OpenTrader":
+				case "!OT":
+					if (MsgBody=="") return bDontShowOpentraderCommandInChat;
+					break;
+			}
+		//通常はそのままテキストを表示
+			return false;
 		//
 	}
 	
