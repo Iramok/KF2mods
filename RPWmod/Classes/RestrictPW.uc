@@ -17,6 +17,7 @@
 //10.29 proの要望でその場でトレーダー開けるようになった
 //11.03 chatcommand実装！やったぜ！
 //11.10 コンソールメッセージがサーバーでは動かなかった どうせ日本語表示されないしいいか :o
+//2018.2.11	2Bossの整形、復活はならず　予備弾倉が2マガジンを切ったら自動購入、エヴィス君は特別な処理
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
@@ -51,6 +52,7 @@ class RestrictPW extends KFMutator
 		var config string StartingWeapons_Swat;
 		var config string DisableWeapons;
 		var config string DisableWeapons_Boss;
+		var config bool bAutoAmmoBuying;
 	/* Player Settings */
 		var config bool bStartingWeapon_AmmoFull;
 		var config bool bPlayer_SpawnWithFullArmor;
@@ -249,6 +251,7 @@ class RestrictPW extends KFMutator
 			StartingWeapons_Swat = "";
 			DisableWeapons = "";
 			DisableWeapons_Boss = "";
+			bAutoAmmoBuying = false;
 		/* Player Settings */
 			bStartingWeapon_AmmoFull = false;
 			bPlayer_SpawnWithFullArmor = false;
@@ -366,7 +369,7 @@ class RestrictPW extends KFMutator
 			SetTimer(1.0, true, nameof(JudgePlayers));
 			SetTimer(0.25, true, nameof(CheckTraderState));
 			SetTimer(1.0, true, nameof(CheckSpawnTwoBossSquad));
-			SetTimer(1.0, true, nameof(HackBroadcastHandler));
+			if (bAutoAmmoBuying) SetTimer(1.0, true, nameof(CheckAutoAmmoBuying));
 		//
 	}
 	
@@ -611,13 +614,14 @@ class RestrictPW extends KFMutator
 			Curwave = MyKFGI.MyKFGRI.WaveNum;
 		//ウェーブが開始されていない場合はどうでもいい
 			if (!(Curwave>=1)) return;
-		//強制的にボスウェーブにするテストコード
-//			if (Curwave<MyKFGI.MyKFGRI.WaveMax) KFGameInfo_Survival(MyKFGI).WaveEnded(WEC_WaveWon);
+//強制的にボスウェーブにするテストコード
+//		if (Curwave<MyKFGI.MyKFGRI.WaveMax) KFGameInfo_Survival(MyKFGI).WaveEnded(WEC_WaveWon);
 		//ボス2体の召喚処理
 			if (Curwave==MyKFGI.MyKFGRI.WaveMax) {
 				if (bSpawnTwoBossSquad) {
 					MyKFGI.SpawnManager.TimeUntilNextSpawn = 10;
 					SetTimer(5.0, false, nameof(SpawnTwoBosses));
+					SetTimer(15.0, false, nameof(SpawnTwoBosses));
 					bSpawnTwoBossSquad = false;
 				}
 			}else{
@@ -630,28 +634,105 @@ class RestrictPW extends KFMutator
 		local array<class<KFPawn_Monster> > SpawnList;
 		local array<String> SplitBuf;
 		local string Buf;
-		local byte rndbs;
+		//Add 2018.02.11
+			local array<class<KFPawn_Monster> > Bosses_Class;
+			local array<String> Bosses_Name;
+			local byte i,Bosses_Len;
+			Bosses_Name.AddItem("Hans");	Bosses_Class.AddItem(class'KFPawn_ZedHans');
+			Bosses_Name.AddItem("Pat");		Bosses_Class.AddItem(class'KFPawn_ZedPatriarch');
+			Bosses_Name.AddItem("KFP");		Bosses_Class.AddItem(class'KFPawn_ZedFleshpoundKing');
+			Bosses_Name.AddItem("KBlt");	Bosses_Class.AddItem(class'KFPawn_ZedBloatKing');
+			Bosses_Len = Bosses_Name.Length;
+		//
 		if (SpawnTwoBossesName=="") {
 			MyKFGI.SpawnManager.TimeUntilNextSpawn = 0;
 			return;
 		}
 		ParseStringIntoArray(SpawnTwoBossesName,SplitBuf,",",true);
 		foreach SplitBuf(Buf) {
-			if (Buf=="Rand") {
-				rndbs = Rand(3);
-				if (rndbs==0) Buf = "Hans";
-				if (rndbs==1) Buf = "Pat";
-				if (rndbs==2) Buf = "KFP";
-			}
-			if (Buf=="Hans") SpawnList.AddItem(class'KFPawn_ZedHans');
-			if (Buf=="Pat") SpawnList.AddItem(class'KFPawn_ZedPatriarch');
-			if (Buf=="KFP") SpawnList.AddItem(class'KFPawn_ZedFleshpoundKing');
-//			SendRestrictMessageStringAll(Buf);
+			//Change 2018.02.11
+				if (Buf=="Rand") {
+					SpawnList.AddItem(Bosses_Class[Rand(Bosses_Len)]);
+				}else{
+					for(i=0;i<Bosses_Len-1;i++) {
+						if (Buf==Bosses_Name[i]) SpawnList.AddItem(Bosses_Class[i]);
+					}
+				}
+//SendRestrictMessageStringAll(Buf);	//test 
 		}
 		MyKFGI.NumAISpawnsQueued += MyKFGI.SpawnManager.SpawnSquad( SpawnList );
 		MyKFGI.SpawnManager.TimeUntilNextSpawn = MyKFGI.SpawnManager.CalcNextGroupSpawnTime();
+//	SendRestrictMessageStringAll("キューの数：" $ MyKFGI.NumAISpawnsQueued $ "  ___  " $ MyKFGI.SpawnManager.TimeUntilNextSpawn	);
+	}
+
+//<<---メイン関数(CheckAutoAmmoBuying)--->>//
+
+	//全プレイヤーについて弾薬の補充を確認する
+	function CheckAutoAmmoBuying() {
+		local KFPlayerController KFPC;
+		//ウェーブが開始されていない場合はどうでもいい
+			if (!(MyKFGI.MyKFGRI.WaveNum>=1)) return;
+		//全PCに対して判定 SpawnHumanPawnに関しては無視
+			foreach WorldInfo.AllControllers(class'KFPlayerController', KFPC) {
+				if ( (KFPC!=None) && (!IsBotPlayer(KFPC)) ) {
+					AutoAmmoBuy(KFPC);
+				}
+			}
+		//
 	}
 	
+	//弾薬自動チャージ 2018.02.10
+	function AutoAmmoBuy(KFPlayerController KFPC) {
+		local KFPlayerReplicationInfo KFPRI;
+		local KFWeapon KFWeap;
+		local int BASH_FIREMODE,i,price,WeapMC;
+		local class<KFWeaponDefinition> WDClass;
+		local bool bEvisAlt;
+		BASH_FIREMODE = 3;
+		KFPRI = KFPlayerReplicationInfo(KFPC.PlayerReplicationInfo);
+		KFWeap = KFWeapon(KFPC.Pawn.Weapon);
+		bEvisAlt = false;
+		if (KFWeap==None) return;
+		//メイン・サブマガジンそれぞれについて見る
+		for (i=0;i<2;i++) {
+			//予備弾倉が2マガジンを切ったら購入
+			WeapMC = KFWeap.MagazineCapacity[i];
+			if (KFWeap.SpareAmmoCount[i] < 2 * WeapMC) {
+				//弾薬の価格を調べたいが、KFWeapからKFWeapDefを直接取りに行けないので、KFDTを経由
+					WDClass = class<KFDamageType>(KFWeap.class.default.InstantHitDamageTypes[BASH_FIREMODE]).default.WeaponDef;
+					price = (i==0 ? WDClass.default.AmmoPricePerMag : WDClass.default.SecondaryAmmoMagPrice);
+					//マガジン増量に対応 増加してた場合その分お金とろうね
+						if (KFWeap.class.default.MagazineCapacity[i] != 0 ) {
+							price = (price * KFWeap.MagazineCapacity[i]) / KFWeap.class.default.MagazineCapacity[i];
+						}
+					//
+					if (price<=0) continue; //買えないものもある
+					if (KFPRI.Score<price) continue; //お金が足りないよ！
+				//買うと予備弾倉ハミる場合は拒否
+					if (KFWeap.SpareAmmoCapacity[i] < KFWeap.SpareAmmoCount[i] + WeapMC) {
+						//エヴィスくんのオルトファイアは別なんだ……
+						if ( (KFWeap_Eviscerator(KFWeap)!=None) && (i==1) ) {
+							WeapMC = WDClass.default.SecondaryAmmoMagSize; //10ずつ買える
+							bEvisAlt = ( KFWeap.AmmoCount[1] < 2* WeapMC ); //オルトの弾倉が20を切ってるなら購入
+						}
+						if (!bEvisAlt) continue;
+					}
+				//補充と購入処理
+//SendRestrictMessageStringAll("less::" $ (i==0?"Main":"Sub"));
+					if (bEvisAlt) {
+						KFWeap.AmmoCount[1] += WeapMC;
+					}else{
+						KFWeap.SpareAmmoCount[i] += WeapMC;
+					}
+					KFPRI.Score -= price;
+				//
+			}
+		}
+//		KFWeap.SpareAmmoCount[0] = KFWeap.SpareAmmoCapacity[0];
+//		KFWeap.SpareAmmoCapacity[0] = 99999;
+//		KFWeap.SpareAmmoCount[1] = KFWeap.SpareAmmoCapacity[1];
+	}
+
 //<<---メイン関数(CheckTraderState)--->>//
 	
 	function CheckTraderState() {
@@ -882,6 +963,8 @@ class RestrictPW extends KFMutator
 			return false;
 		}
 	}
+		
+//----------------testcodes----------------//
 
 	//使用禁止武器かどうか
 	function bool IsWeaponRestricted(Weapon Weap,eWaveType eWT) {
