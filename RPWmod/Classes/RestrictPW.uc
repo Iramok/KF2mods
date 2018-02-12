@@ -18,6 +18,7 @@
 //11.03 chatcommand実装！やったぜ！
 //11.10 コンソールメッセージがサーバーでは動かなかった どうせ日本語表示されないしいいか :o
 //2018.2.11	2Bossの整形、復活はならず　予備弾倉が2マガジンを切ったら自動購入、エヴィス君は特別な処理
+//02.12	SetTimer(1.0, true, nameof(HackBroadcastHandler));を消してた……／(^o^)＼ﾅﾝﾃｺｯﾀｲ
 
 class RestrictPW extends KFMutator
 	config(RestrictPW);
@@ -369,6 +370,7 @@ class RestrictPW extends KFMutator
 			SetTimer(1.0, true, nameof(JudgePlayers));
 			SetTimer(0.25, true, nameof(CheckTraderState));
 			SetTimer(1.0, true, nameof(CheckSpawnTwoBossSquad));
+			SetTimer(1.0, true, nameof(HackBroadcastHandler));
 			if (bAutoAmmoBuying) SetTimer(1.0, true, nameof(CheckAutoAmmoBuying));
 		//
 	}
