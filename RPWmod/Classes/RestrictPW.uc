@@ -122,6 +122,8 @@ class RestrictPW extends KFMutator
 		var array<RestrictMessageInfo> RMI;
 	//CheckSpawnTwoBossSquad用
 		var bool bSpawnTwoBossSquad;
+	//!dappunが有効かどうか
+		var string EnableDappun;
 	//
 	
 //<<---定数の定義--->>//
@@ -369,9 +371,11 @@ class RestrictPW extends KFMutator
 		//1.0秒ごとに特定の関数を呼ぶ bool値は繰り返し呼ぶかどうか
 			SetTimer(1.0, true, nameof(JudgePlayers));
 			SetTimer(0.25, true, nameof(CheckTraderState));
-			SetTimer(1.0, true, nameof(CheckSpawnTwoBossSquad));
+			//SetTimer(1.0, true, nameof(CheckSpawnTwoBossSquad));
 			SetTimer(1.0, true, nameof(HackBroadcastHandler));
 			if (bAutoAmmoBuying) SetTimer(1.0, true, nameof(CheckAutoAmmoBuying));
+		//!dappunは通常無効化
+			 EnableDappun = "False";
 		//
 	}
 	
@@ -608,7 +612,9 @@ class RestrictPW extends KFMutator
 	}
 	
 //<<---メイン関数(CheckSpawnTwoBossSquad)--->>//
-	
+
+/*
+
 	//2体目のボスを召喚 1.0秒ごとに呼び出し
 	function CheckSpawnTwoBossSquad() {
 		local byte Curwave;
@@ -666,6 +672,8 @@ class RestrictPW extends KFMutator
 		MyKFGI.SpawnManager.TimeUntilNextSpawn = MyKFGI.SpawnManager.CalcNextGroupSpawnTime();
 //	SendRestrictMessageStringAll("キューの数：" $ MyKFGI.NumAISpawnsQueued $ "  ___  " $ MyKFGI.SpawnManager.TimeUntilNextSpawn	);
 	}
+
+*/
 
 //<<---メイン関数(CheckAutoAmmoBuying)--->>//
 
@@ -1090,6 +1098,9 @@ class RestrictPW extends KFMutator
 				case "!hawawa":
 					Broadcast_Special(MsgBody);
 					break;
+				case "!dappun":
+				 	Broadcast_Puke(GetKFPCFromPRI(SenderPRI),MsgBody);
+					break;
 			}
 		//
 	}
@@ -1164,10 +1175,12 @@ class RestrictPW extends KFMutator
 				SendRestrictMessageStringConsoleAll("::"$InfoBuf);
 			}
 		//複数ボスの名前
+			/*
 			if (SpawnTwoBossesName!="") {
 				InfoBuf = "BossName// "$SpawnTwoBossesName;
 				SendRestrictMessageStringConsoleAll("::"$InfoBuf);
 			}
+			*/
 		//
 	}
 	
@@ -1257,6 +1270,12 @@ class RestrictPW extends KFMutator
 			case ":o":
 				SendRestrictMessageStringAll("::はわわわ、びっくりしたのです！");
 				break;
+			case ":)":
+				SendRestrictMessageStringAll("::ありがとう、なのです！");
+				break;
+			case ":(":
+				SendRestrictMessageStringAll("::はわわっ！？恥ずかしいよぉ");
+				break;
 			default:
 				if (nonemeg) {
 					SendRestrictMessageStringAll("::はにゃあーっ？！");
@@ -1267,19 +1286,24 @@ class RestrictPW extends KFMutator
 		}
 	}
 
-/*
-
-	case "!dappun":
-		if (MsgBody=="") Broadcast_Puke(GetKFPCFromPRI(SenderPRI));
-		break;		
-	
 	//!dappun: お遊び その2
-	function Broadcast_Puke(KFPlayerController KFPC) {
+	function Broadcast_Puke(KFPlayerController KFPC,string Msg) {
 		local KFPawn_Human KFPH;
 		local byte i,MineNum;
 		local float ExplodeTimer;
 		local rotator DPMR; //DeathPukeMineRotations_Mine
 		local KFProjectile PukeMine;
+		//有効な場合のみ処理
+		if (EnableDappun != "True") {
+			//有効化フラグの設定　一度Disableになるとそのゲーム中で有効になることはない
+			if (Msg=="Enable") EnableDappun = "True";
+			if (Msg=="Disable") EnableDappun = "Disable";
+			return;
+		}
+		//このコマンドは5秒に1回だけ有効
+		EnableDappun = "False";
+		SetTimer(5.0, false, nameof(Broadcast_Puke_ReserveEnable));
+		//処理開始
 		KFPH = KFPawn_Human(KFPC.Pawn);
 		MineNum = 5;
 		ExplodeTimer = 5.0f;
@@ -1295,6 +1319,10 @@ class RestrictPW extends KFMutator
 		}
 		SendRestrictMessageStringAll("::糞まみれになろうや。");
 	}
-*/
+
+	//!dappunの管理
+	function Broadcast_Puke_ReserveEnable() {
+		if (EnableDappun=="False") EnableDappun = "True";
+	}
 	
 /////////////////////////////////////////<<---EOF--->>/////////////////////////////////////////
