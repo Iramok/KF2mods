@@ -101,7 +101,11 @@ class RestrictPW extends KFMutator
 		var KFPlayerController RMPC;
 		var string RMStr;
 	//IsWeaponRestricted用
-		var array<string> aDisableWeapons,aDisableWeapons_Boss;
+		struct DisableInfo {
+			var string name;	//武器名
+			var int upgrade;	//アップグレード数
+		};
+		var array<DisableInfo> aDisableWeapons,aDisableWeapons_Boss;
 	//CheckTraderState用
 		var bool bOpened;
 	//MaxPlayer_TotalZedsCount用
@@ -325,14 +329,23 @@ class RestrictPW extends KFMutator
 	}
 	
 	//IsWeaponRestricted用の初期化関数
-	function InitDisableWeaponClass(string StrDW,out array<string> aStrDW) {
+	function InitDisableWeaponClass(string StrDW,out array<DisableInfo> aStrDW) {
 		local string buf;
-		local array<String> splitbuf;
+		local array<String> splitbuf,infobuf;
 		local class<Weapon> cWbuf;
+		local DisableInfo DInfo;
 		ParseStringIntoArray(StrDW,splitbuf,",",true);
 		foreach splitbuf(buf) {
-			cWbuf = GetWeapClassFromString("KFGameContent.KFWeap_" $buf);
-			if (cWbuf!=None) aStrDW.AddItem(cWbuf.default.ItemName);
+			//特に記述がない場合、武器そのものを禁止にする（アップグレード問わず）
+			if (instr(buf,":")==-1) buf = "0:" $ buf;
+			//名前とBanLevelを分ける	例 "1:Bow_Crossbow"
+			ParseStringIntoArray(buf,infobuf,":",true); 
+			cWbuf = GetWeapClassFromString("KFGameContent.KFWeap_"$infobuf[1]);
+			if (cWbuf!=None) {
+				DInfo.name  = cWbuf.default.ItemName;
+				Dinfo.upgrade = int(infobuf[0]);
+				aStrDW.AddItem(DInfo);
+			}
 		}
 	}
 
@@ -913,6 +926,9 @@ class RestrictPW extends KFMutator
 			SetRestrictMessagePC(KFPC);
 		//禁止武器を使用している場合は強制的に消滅させる Old: KFPC.ServerThrowOtherWeapon(CurWeapon);
 			if (IsWeaponRestricted(CurWeapon,eWT)) {
+				//店を開いていた場合は閉じるように（アップグレードで金だけ吸われる状況を考えて）
+				KFPC.CloseTraderMenu();
+				//
 				SendRestrictMessageString();
 				CurWeapon.Destroyed();
 			}
@@ -978,17 +994,20 @@ class RestrictPW extends KFMutator
 
 	//使用禁止武器かどうか
 	function bool IsWeaponRestricted(Weapon Weap,eWaveType eWT) {
-		local array<string> aDWName;
-		local string WName,DWName;
+		local array<DisableInfo> aDInfo;
+		local DisableInfo DInfo;
+		local string WName;
+		local int uindex;
 		//前処理
 			if (KFWeapon(Weap)==None) return false;
 			WName = Weap.ItemName;
-			if (eWT==WaveType_Normal)	aDWName = aDisableWeapons;
-			if (eWT==WaveType_Boss)		aDWName = aDisableWeapons_Boss;
+			uindex = KFWeapon(Weap).CurrentWeaponUpgradeIndex;
+			if (eWT==WaveType_Normal)	aDInfo = aDisableWeapons;
+			if (eWT==WaveType_Boss)		aDInfo = aDisableWeapons_Boss;
 		//各武器毎の判定。
-			foreach aDWName(DWName) {
-				if (WName==DWName) {
-					SetRestrictMessageString("::DestroyWeapon::"$WName$"::RestrictedWeapon");
+			foreach aDInfo(Dinfo) {
+				if ( (uindex>=DInfo.upgrade) && (WName==DInfo.name) ) {
+					SetRestrictMessageString("::DestroyBannedWeapon::"$WName);
 					return true;
 				}
 			}
@@ -1117,6 +1136,9 @@ class RestrictPW extends KFMutator
 				case "!OpenTrader":
 				case "!OT":
 					if (MsgBody=="") return bDontShowOpentraderCommandInChat;
+					break;
+				case "!dappun":
+					if (MsgBody!="") return true;
 					break;
 			}
 		//通常はそのままテキストを表示
@@ -1248,13 +1270,13 @@ class RestrictPW extends KFMutator
 	}
 	
 	//RPWInfoに武器の名前を書く
-	function Broadcast_RPWInfo_AddWeapInfo(out string InfoBuf,array<string> aWeapName) {
-		local string WName;
+	function Broadcast_RPWInfo_AddWeapInfo(out string InfoBuf,array<DisableInfo> aWeapName) {
+		local DisableInfo DInfo;
 		local bool nl; //new line
 		nl = false;
-		foreach aWeapName(WName) {
+		foreach aWeapName(Dinfo) {
 			if (nl) InfoBuf $= ",";
-			InfoBuf $= WName;
+			InfoBuf $= DInfo.name$"["$DInfo.upgrade$"]";
 			nl = true;
 		}
 	}
@@ -1293,15 +1315,15 @@ class RestrictPW extends KFMutator
 		local float ExplodeTimer;
 		local rotator DPMR; //DeathPukeMineRotations_Mine
 		local KFProjectile PukeMine;
+		//有効化フラグの設定　
+		if (Msg==":Enable") EnableDappun = "True";
+		if (Msg==":Disable") EnableDappun = "False";
 		//有効な場合のみ処理
-		if (EnableDappun != "True") {
-			//有効化フラグの設定　一度Disableになるとそのゲーム中で有効になることはない
-			if (Msg=="Enable") EnableDappun = "True";
-			if (Msg=="Disable") EnableDappun = "Disable";
-			return;
-		}
+		if (EnableDappun=="False") return;
+		//トレーダータイムのみ使用可
+		if (MyKFGI.MyKFGRI.bTraderIsOpen==false) return;
 		//このコマンドは5秒に1回だけ有効
-		EnableDappun = "False";
+		EnableDappun = "Reserved";
 		SetTimer(5.0, false, nameof(Broadcast_Puke_ReserveEnable));
 		//処理開始
 		KFPH = KFPawn_Human(KFPC.Pawn);
@@ -1322,7 +1344,7 @@ class RestrictPW extends KFMutator
 
 	//!dappunの管理
 	function Broadcast_Puke_ReserveEnable() {
-		if (EnableDappun=="False") EnableDappun = "True";
+		if (EnableDappun=="Reserved") EnableDappun = "True";
 	}
 	
 /////////////////////////////////////////<<---EOF--->>/////////////////////////////////////////
